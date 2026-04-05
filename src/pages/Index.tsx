@@ -4,39 +4,55 @@ import StatsCards from "@/components/StatsCards";
 import ProgressBar from "@/components/ProgressBar";
 import TaskCard from "@/components/TaskCard";
 import TaskFilters from "@/components/TaskFilters";
-import { getTasks, saveTasks, getStats, Task, Status } from "@/lib/taskStore";
+import { getTasks, updateTask, deleteTask as removeTask, getStats, Task, Status } from "@/lib/taskStore";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const { toast } = useToast();
 
-  useEffect(() => setTasks(getTasks()), []);
-
-  const persist = (updated: Task[]) => {
-    setTasks(updated);
-    saveTasks(updated);
+  const loadTasks = async () => {
+    try {
+      const data = await getTasks();
+      setTasks(data);
+    } catch (err) {
+      toast({ title: "Error loading tasks", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleComplete = (id: string) => {
-    persist(
-      tasks.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "done" ? "todo" as Status : "done" as Status, completedAt: t.status === "done" ? undefined : new Date().toISOString() }
-          : t
-      )
-    );
+  useEffect(() => { loadTasks(); }, []);
+
+  const toggleComplete = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const newStatus: Status = task.status === "done" ? "todo" : "done";
+    await updateTask(id, { status: newStatus, completed_at: newStatus === "done" ? new Date().toISOString() : null });
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: newStatus, completed_at: newStatus === "done" ? new Date().toISOString() : null } : t));
   };
 
-  const deleteTask = (id: string) => persist(tasks.filter((t) => t.id !== id));
+  const handleDelete = async (id: string) => {
+    await removeTask(id);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  };
 
-  const togglePin = (id: string) =>
-    persist(tasks.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
+  const togglePin = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    await updateTask(id, { pinned: !task.pinned });
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, pinned: !t.pinned } : t));
+  };
 
-  const changeStatus = (id: string, status: Status) =>
-    persist(tasks.map((t) => (t.id === id ? { ...t, status, completedAt: status === "done" ? new Date().toISOString() : undefined } : t)));
+  const changeStatus = async (id: string, status: Status) => {
+    await updateTask(id, { status, completed_at: status === "done" ? new Date().toISOString() : null });
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status, completed_at: status === "done" ? new Date().toISOString() : null } : t));
+  };
 
   const filtered = useMemo(() => {
     let result = [...tasks];
@@ -70,7 +86,11 @@ const Index = () => {
             priorityFilter={priorityFilter} onPriorityFilter={setPriorityFilter}
             categoryFilter={categoryFilter} onCategoryFilter={setCategoryFilter}
           />
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="rounded-xl border bg-card p-12 text-center">
+              <p className="text-lg font-medium text-muted-foreground">Loading tasks...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="rounded-xl border bg-card p-12 text-center">
               <p className="text-lg font-medium text-muted-foreground">No tasks found</p>
               <p className="text-sm text-muted-foreground mt-1">Add a task to get started!</p>
@@ -82,7 +102,7 @@ const Index = () => {
                   key={task.id}
                   task={task}
                   onToggleComplete={toggleComplete}
-                  onDelete={deleteTask}
+                  onDelete={handleDelete}
                   onTogglePin={togglePin}
                   onStatusChange={changeStatus}
                 />

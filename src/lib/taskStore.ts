@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export type Priority = "high" | "medium" | "low";
 export type Status = "todo" | "in-progress" | "done";
 export type Category = "homework" | "study" | "project" | "exam" | "personal" | "other";
@@ -5,46 +7,63 @@ export type Category = "homework" | "study" | "project" | "exam" | "personal" | 
 export interface Task {
   id: string;
   title: string;
+  description?: string | null;
+  priority: Priority;
+  status: Status;
+  category: Category;
+  deadline?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+  pinned: boolean;
+}
+
+export async function getTasks(): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as Task[];
+}
+
+export async function addTask(task: {
+  title: string;
   description?: string;
   priority: Priority;
   status: Status;
   category: Category;
   deadline?: string;
-  createdAt: string;
-  completedAt?: string;
-  pinned?: boolean;
+}): Promise<Task> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      title: task.title,
+      description: task.description || null,
+      priority: task.priority,
+      status: task.status,
+      category: task.category,
+      deadline: task.deadline || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Task;
 }
 
-const STORAGE_KEY = "persistly_tasks";
-
-export function getTasks(): Task[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw ? JSON.parse(raw) : [];
+export async function updateTask(id: string, updates: Partial<Task>) {
+  const { error } = await supabase
+    .from("tasks")
+    .update(updates)
+    .eq("id", id);
+  if (error) throw error;
 }
 
-export function saveTasks(tasks: Task[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-}
-
-export function addTask(task: Omit<Task, "id" | "createdAt">): Task {
-  const tasks = getTasks();
-  const newTask: Task = {
-    ...task,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
-  tasks.unshift(newTask);
-  saveTasks(tasks);
-  return newTask;
-}
-
-export function updateTask(id: string, updates: Partial<Task>) {
-  const tasks = getTasks().map((t) => (t.id === id ? { ...t, ...updates } : t));
-  saveTasks(tasks);
-}
-
-export function deleteTask(id: string) {
-  saveTasks(getTasks().filter((t) => t.id !== id));
+export async function deleteTask(id: string) {
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export function getStats(tasks: Task[]) {
@@ -53,6 +72,6 @@ export function getStats(tasks: Task[]) {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === "done").length,
     pending: tasks.filter((t) => t.status !== "done").length,
-    todayAdded: tasks.filter((t) => new Date(t.createdAt).toDateString() === today).length,
+    todayAdded: tasks.filter((t) => new Date(t.created_at).toDateString() === today).length,
   };
 }

@@ -15,13 +15,21 @@ const AddTask = () => {
   const [category, setCategory] = useState<Category>("homework");
   const [priority, setPriority] = useState<Priority>("medium");
   const [deadline, setDeadline] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const canNext = step === 0 ? title.trim().length > 0 : true;
 
-  const handleSubmit = () => {
-    addTask({ title, description, category, priority, deadline: deadline || undefined, status: "todo" });
-    toast({ title: "Task added!", description: `"${title}" has been created.` });
-    navigate("/");
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await addTask({ title, description, category, priority, deadline: deadline || undefined, status: "todo" });
+      toast({ title: "Task added!", description: `"${title}" has been created.` });
+      navigate("/");
+    } catch (err) {
+      toast({ title: "Error creating task", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputClass = "w-full rounded-lg border bg-card px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
@@ -97,8 +105,8 @@ const AddTask = () => {
               Next
             </button>
           ) : (
-            <button onClick={handleSubmit} className="rounded-lg gradient-primary px-6 py-2.5 text-sm font-bold text-primary-foreground">
-              Create Task
+            <button onClick={handleSubmit} disabled={submitting} className="rounded-lg gradient-primary px-6 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40">
+              {submitting ? "Creating..." : "Create Task"}
             </button>
           )}
         </div>
