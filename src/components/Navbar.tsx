@@ -1,9 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import { useTheme } from "@/components/ThemeProvider";
 
 const Navbar = () => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
@@ -12,10 +14,12 @@ const Navbar = () => {
           <img src={logo} alt="Persistly" className="h-9 w-9" />
           <span className="text-xl font-bold text-foreground">Persistly</span>
         </Link>
-        <div className="flex items-center gap-1">
+
+        <div className="flex items-center gap-2">
           {[
             { path: "/", label: "Dashboard" },
             { path: "/add", label: "Add Task" },
+            { path: "/about", label: "About Us" },
           ].map(({ path, label }) => (
             <Link
               key={path}
@@ -29,6 +33,14 @@ const Navbar = () => {
               {label}
             </Link>
           ))}
+
+          <button
+            onClick={toggleTheme}
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Toggle Theme"
+          >
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
         </div>
       </div>
     </nav>
